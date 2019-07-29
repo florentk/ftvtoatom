@@ -5,16 +5,19 @@ from datetime import datetime
 from bs4 import BeautifulSoup
 from http.server import BaseHTTPRequestHandler,HTTPServer
 from urllib.request import urlopen 
+from urllib.error import HTTPError
 
 APP_NAME = u'ftvtoatom'
 APP_LINK = u'https://bitbucket.org/florent_k/ftvtoatom'
-APP_VERSION = u'0.1'
+APP_VERSION = u'0.2'
+
 PORT_NUMBER = 58080
+DOMAIN = u'https://www.france.tv'
 
 def generate_entry(e,date):
   e=[u'\n<entry>',
     u'\t<title>' + e['title'] + u'</title>',
-    u'\t<link href="' + e['link'] + u'"/>',
+    u'\t<link href="' + DOMAIN + e['link'] + u'"/>',
     u'\t<id>' + e['uid'] + u'</id>',
     u'\t<updated>' + date.isoformat("T") + u"Z" + u'</updated>',
     u'\t<summary>' + e['content'] + u'</summary>' ,
@@ -39,32 +42,38 @@ def generate_atom(title,link,emissions):
 
 
 
-def extract_element(li):
-	attrs = dict(li.find('a').attrs)
-	link = attrs['href']
-	title = attrs['title']
-	uid = attrs['data-video']
-	content = r"\n".join([ p.string.strip() for p in li.find('div', {"class": "card-content"}).findAll('p')])
-	return {"link":link,"title":title,"content":content,"uid":uid}
+def extract_element(v):
+	content = v.text
+	a = v.find(class_='c-card-video__textarea').h3.a
+	link = a['href']
+	title = a.find('div',class_='c-card-video__title').text
+	desc_div=a.find('div',class_='c-card-video__description')
+	if(desc_div):
+	  desc = desc_div.text
+	else:
+	  desc = ""
+	uid = a['href']
+	return {"link":link,"title":"%s - %s" % (title,desc),"content":content,"uid":uid}
 	
 def get_emissions(s):
-	return [ extract_element(li) for li in s.findAll("li") ]
+	return [ extract_element(v) for v in s.find_all("div", class_='c-card-video') ]
 
 
 title = u"France Tv Documentaires"
-url = u"https://www.france.tv/documentaires/contents"
+url_pattern = u"%s/%s/contents"
 
 
 
 class MyHandler(BaseHTTPRequestHandler):
 	def do_GET(s):
-		if(s.path == "" or s.path == "/"):
+		url = url_pattern % (DOMAIN,s.path)
+		try:
 			emissions = get_emissions(BeautifulSoup(urlopen(url),"lxml"))
 			s.send_response(200)
 			s.send_header("Content-type", "application/atom+xml")
 			s.end_headers()
 			s.wfile.write(bytes(generate_atom(title,url,emissions),"utf8"))
-		else:
+		except HTTPError:
 			s.send_error(404,"Page not found")
 
 def main():
