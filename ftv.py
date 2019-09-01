@@ -14,7 +14,7 @@ APP_VERSION = u'0.2'
 PORT_NUMBER = 58080
 DOMAIN = u'https://www.france.tv'
 
-DURATION_MIN=20
+DURATION_MIN=25
 
 def generate_entry(e,date):
   e=[u'\n<entry>',
@@ -47,8 +47,17 @@ def generate_atom(title,link,emissions):
 def extract_element(v):
 	content = v.text
 	metadatas = v.find_all('span',class_='c-metadata')
-	date = metadatas[0].text
-	duration = int(metadatas[1].text.split()[0])
+	
+	if (len(metadatas) == 2):
+	  date = metadatas[0].text
+	  duration = int(metadatas[1].text.split()[0])
+	elif (len(metadatas) == 1):
+	  date = ""
+	  duration = int(metadatas[0].text.split()[0])
+	else:
+	  date = ""
+	  duration = 0
+	  
 	a = v.find(class_='c-card-video__textarea').h3.a
 	link = a['href']
 	title = a.find('div',class_='c-card-video__title').text
